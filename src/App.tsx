@@ -99,7 +99,19 @@ export default function App() {
         setError('')
         setUpdated(Date.now())
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (cancelled) return
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(
+          /permission/i.test(msg)
+            ? `${msg} — create an API key with the DataApi permission at solami.dev → API keys`
+            : msg,
+        )
+        try {
+          const fb = await fetchTradesFromRpc(key)
+          setTrades(fb)
+        } catch {
+          /* keep previous */
+        }
       }
     }
     void tick()

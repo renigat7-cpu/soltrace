@@ -88,7 +88,16 @@ async function jsonReq(url: string, key?: string): Promise<unknown> {
   const res = await fetch(url, {
     headers: { 'x-api-key': key ?? '', Authorization: key ? `Bearer ${key}` : '' },
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${key ? '' : '(no key)'}`)
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`
+    try {
+      const body = (await res.json()) as { message?: string }
+      if (body && body.message) msg = body.message
+    } catch {
+      /* non-JSON error */
+    }
+    throw new Error(key ? msg : `${msg} (no key)`)
+  }
   return res.json()
 }
 
