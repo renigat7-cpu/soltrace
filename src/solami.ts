@@ -215,13 +215,15 @@ export function openTradeSocket(key: string, onTrade: (t: Trade) => void): () =>
 
 export function fmtUsd(v: number | null): string {
   if (v === null) return '—'
-  if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}k`
+  const a = Math.abs(v)
+  if (a >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
+  if (a >= 1_000) return `$${(v / 1_000).toFixed(1)}k`
+  if (a > 0 && a < 0.01) return `$${v.toPrecision(3)}`
   return `$${v.toFixed(2)}`
 }
 
 export function fmtSol(v: number | null): string {
-  return v === null ? '—' : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}◎`
+  return v === null || v === 0 ? '—' : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}◎`
 }
 
 export function shortWallet(s: string): string {
