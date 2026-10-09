@@ -47,6 +47,13 @@ function shortAddr(s: unknown): string {
   return `${str.slice(0, 4)}…${str.slice(-4)}`
 }
 
+function shortToken(sym: unknown, mint: unknown): string {
+  const s = typeof sym === 'string' ? sym.trim() : ''
+  if (s) return s
+  const m = typeof mint === 'string' ? mint : ''
+  return m ? `${m.slice(0, 4)}…` : '?'
+}
+
 export function toTrades(o: unknown): Trade[] {
   return asArr(o)
     .map((it) => {
@@ -54,13 +61,16 @@ export function toTrades(o: unknown): Trade[] {
       const sig = String(pick(it, ['signature', 'sig', 'tx', 'txid', 'txHash']) ?? '')
       return {
         token: String(pick(it, ['token', 'mint', 'tokenAddress', 'token_mint']) ?? ''),
-        symbol: String(pick(it, ['symbol', 'tokenSymbol', 'name']) ?? '?'),
+        symbol: shortToken(
+          pick(it, ['symbol', 'name', 'tokenSymbol']),
+          pick(it, ['token', 'mint', 'tokenAddress', 'token_mint']),
+        ),
         side: side.startsWith('b') ? ('buy' as const) : side.startsWith('s') ? ('sell' as const) : ('buy' as const),
-        usd: num(pick(it, ['usd', 'usd_value', 'valueUsd', 'amountUsd', 'usdValue', 'quoteUsd'])),
-        sol: num(pick(it, ['sol', 'sol_value', 'solValue', 'amountSol', 'lamports'])),
+        usd: num(pick(it, ['volume_usd', 'usd', 'usd_value', 'valueUsd', 'amountUsd', 'usdValue', 'quoteUsd'])),
+        sol: num(pick(it, ['volume_sol', 'sol', 'sol_value', 'solValue', 'amountSol'])),
         dex: String(pick(it, ['dex', 'venue', 'program', 'poolName', 'market']) ?? '—'),
         pool: String(pick(it, ['pool', 'poolId', 'marketId']) ?? '—'),
-        ts: tsOf(pick(it, ['ts', 'created_at', 'createdAt', 'time', 'unix_time', 'timestamp'])),
+        ts: tsOf(pick(it, ['block_time', 'ts', 'created_at', 'createdAt', 'time', 'unix_time', 'timestamp'])),
         sig,
       }
     })
@@ -70,7 +80,9 @@ export function toTrades(o: unknown): Trade[] {
 export function toPnl(o: unknown): PnlRow[] {
   return asArr(o).map((it, i) => ({
     wallet: String(pick(it, ['wallet', 'address', 'owner', 'trader']) ?? '—'),
-    pnl: num(pick(it, ['pnl', 'realized_pnl', 'realizedPnl', 'totalPnl'])),
+    pnl: num(
+      pick(it, ['net_flow_usd', 'net_flow_after_fees_usd', 'pnl', 'realized_pnl', 'realizedPnl', 'totalPnl']),
+    ),
     rank: num(pick(it, ['rank', 'position'])) ?? i + 1,
   }))
 }
@@ -79,8 +91,8 @@ export function toTrending(o: unknown): TrendingItem[] {
   return asArr(o).map((it) => ({
     symbol: String(pick(it, ['symbol', 'name']) ?? '?'),
     mint: String(pick(it, ['mint', 'token', 'address']) ?? ''),
-    usd: num(pick(it, ['price', 'usd', 'priceUsd'])),
-    pct24h: num(pick(it, ['change_24h', 'pct24h', 'change', 'price24hChange'])),
+    usd: num(pick(it, ['price_usd', 'price', 'usd', 'priceUsd'])),
+    pct24h: num(pick(it, ['price_change_pct', 'change_24h', 'pct24h', 'change', 'price24hChange'])),
   }))
 }
 
@@ -102,20 +114,20 @@ async function jsonReq(url: string, key?: string): Promise<unknown> {
 }
 
 export async function fetchTrades(key: string, minUsd: number): Promise<Trade[]> {
-  const q = minUsd > 0 ? `?min_usd=${minUsd}` : ''
+  const largeQ = minUsd > 0 ? `&min_usd=${minUsd}` : ''
   const [recent, large] = await Promise.all([
-    jsonReq(`${API}/data/trades/recent${q}`, key).then(toTrades),
-    jsonReq(`${API}/data/trades/large${q}`, key).then(toTrades),
+    jsonReq(`${API}/data/trades/recent?chain=solana`, key).then(toTrades),
+    jsonReq(`${API}/data/trades/large?chain=solana${largeQ}`, key).then(toTrades),
   ])
   return [...large, ...recent].slice(0, 40)
 }
 
 export async function fetchLeaderboard(key: string): Promise<PnlRow[]> {
-  return jsonReq(`${API}/data/pnl/leaderboard`, key).then(toPnl)
+  return jsonReq(`${API}/data/pnl/leaderboard?chain=solana`, key).then(toPnl)
 }
 
 export async function fetchTrending(key: string): Promise<TrendingItem[]> {
-  return jsonReq(`${API}/data/token/trending`, key).then(toTrending)
+  return jsonReq(`${API}/data/token/trending?chain=solana`, key).then(toTrending)
 }
 
 export async function fetchTradesFromRpc(key?: string): Promise<Trade[]> {
